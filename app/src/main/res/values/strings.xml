@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">DataMint</string>
+    <string name="tagline">Monetize unused bandwidth with live telemetry &amp; cloud ledger</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="sign_out">Sign out</string>
+    <string name="nav_node">Node</string>
+    <string name="nav_market">Market</string>
+    <string name="nav_wallet">Wallet</string>
+    <string name="nav_history">Ledger</string>
+    <string name="node_active">Node Sharing Active</string>
+    <string name="node_paused">Node Standby</string>
+    <string name="start_selling_mb">Start Selling MB</string>
+    <string name="stop_and_save">Stop &amp; Credit Session</string>
+    <string name="disclosure_banner">Payouts record verified requests in your Cloud Firestore ledger. Live cash disbursement requires connecting a payment gateway (Razorpay/UPI/PayPal) and an enterprise bandwidth buyer partner on your backend.</string>
+    <string name="error_generic">Something went wrong. Please try again.</string>
+</resources>

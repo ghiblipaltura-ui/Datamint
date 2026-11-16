@@ -1,0 +1,218 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Shared Primitives ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isNumber(val) {
+      return val is int || val is float;
+    }
+
+    // --- Validation Helpers ---
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 60 &&
+             data.wifiOnly is bool &&
+             data.dailyCapMb is int && data.dailyCapMb >= 50 && data.dailyCapMb <= 50000 &&
+             data.minBatteryPct is int && data.minBatteryPct >= 10 && data.minBatteryPct <= 90 &&
+             isNumber(data.ratePer100MbInr) && data.ratePer100MbInr >= 0.1 && data.ratePer100MbInr <= 100.0 &&
+             isNumber(data.totalMbSold) && data.totalMbSold >= 0.0 && data.totalMbSold <= 10000000.0 &&
+             isNumber(data.availableBalanceInr) && data.availableBalanceInr >= 0.0 && data.availableBalanceInr <= 1000000.0 &&
+             isNumber(data.pendingPayoutInr) && data.pendingPayoutInr >= 0.0 && data.pendingPayoutInr <= 1000000.0 &&
+             isNumber(data.totalWithdrawnInr) && data.totalWithdrawnInr >= 0.0 && data.totalWithdrawnInr <= 1000000.0 &&
+             (!('defaultUpiId' in data) || (data.defaultUpiId is string && data.defaultUpiId.size() <= 80)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidBandwidthSession(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.networkType is string && data.networkType in ['Wi-Fi', '5G', '4G LTE', 'Mobile', 'Ethernet'] &&
+             isNumber(data.mbShared) && data.mbShared >= 0.0 && data.mbShared <= 50000.0 &&
+             isNumber(data.estimatedEarningsInr) && data.estimatedEarningsInr >= 0.0 && data.estimatedEarningsInr <= 50000.0 &&
+             isNumber(data.avgSpeedMbps) && data.avgSpeedMbps >= 0.0 && data.avgSpeedMbps <= 10000.0 &&
+             data.durationSeconds is int && data.durationSeconds >= 0 && data.durationSeconds <= 86400 &&
+             data.status is string && data.status in ['completed', 'capped'] &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidPayoutRequest(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             isNumber(data.amountInr) && data.amountInr >= 1.0 && data.amountInr <= 50000.0 &&
+             data.method is string && data.method in ['UPI', 'PayPal', 'Bank Transfer'] &&
+             data.destination is string && data.destination.size() >= 3 && data.destination.size() <= 80 &&
+             data.status is string && data.status in ['pending_settlement', 'cancelled'] &&
+             (!('note' in data) || (data.note is string && data.note.size() <= 160)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidListing(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.sellerAlias is string && data.sellerAlias.size() >= 2 && data.sellerAlias.size() <= 40 &&
+             data.packageTitle is string && data.packageTitle.size() >= 3 && data.packageTitle.size() <= 60 &&
+             data.mbAmount is int && data.mbAmount >= 50 && data.mbAmount <= 50000 &&
+             isNumber(data.priceInr) && data.priceInr >= 1.0 && data.priceInr <= 10000.0 &&
+             data.networkType is string && data.networkType in ['Wi-Fi', '5G', '4G LTE', 'Any'] &&
+             data.status is string && data.status in ['active', 'paused', 'closed'] &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // --- Collection: /users/{userId} ---
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'userId', 'displayName', 'wifiOnly', 'dailyCapMb',
+                         'minBatteryPct', 'ratePer100MbInr', 'totalMbSold',
+                         'availableBalanceInr', 'pendingPayoutInr', 'totalWithdrawnInr',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'displayName', 'wifiOnly', 'dailyCapMb',
+                         'minBatteryPct', 'ratePer100MbInr', 'totalMbSold',
+                         'availableBalanceInr', 'pendingPayoutInr', 'totalWithdrawnInr',
+                         'defaultUpiId', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'displayName', 'wifiOnly', 'dailyCapMb', 'minBatteryPct',
+                         'ratePer100MbInr', 'totalMbSold', 'availableBalanceInr',
+                         'pendingPayoutInr', 'totalWithdrawnInr', 'defaultUpiId', 'updatedAt'
+                       ]);
+
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      // --- Subcollection: /users/{userId}/sessions/{sessionId} ---
+      match /sessions/{sessionId} {
+        allow get: if isOwner(userId) && isValidId(sessionId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(sessionId) &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll([
+                           'userId', 'networkType', 'mbShared', 'estimatedEarningsInr',
+                           'avgSpeedMbps', 'durationSeconds', 'status', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'networkType', 'mbShared', 'estimatedEarningsInr',
+                           'avgSpeedMbps', 'durationSeconds', 'status', 'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidBandwidthSession(incoming());
+
+        allow update: if false;
+        allow delete: if isOwner(userId) && isValidId(sessionId);
+      }
+
+      // --- Subcollection: /users/{userId}/payouts/{payoutId} ---
+      match /payouts/{payoutId} {
+        allow get: if isOwner(userId) && isValidId(payoutId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(payoutId) &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().status == 'pending_settlement' &&
+                         incoming().keys().hasAll([
+                           'userId', 'amountInr', 'method', 'destination',
+                           'status', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'amountInr', 'method', 'destination',
+                           'status', 'note', 'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidPayoutRequest(incoming());
+
+        // Terminal State Lock: only pending_settlement -> cancelled allowed
+        allow update: if isOwner(userId) &&
+                         isValidId(payoutId) &&
+                         isValidPayoutRequest(incoming()) &&
+                         existing().status == 'pending_settlement' &&
+                         incoming().status == 'cancelled' &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+        allow delete: if false;
+      }
+    }
+
+    // --- Collection: /listings/{listingId} ---
+    match /listings/{listingId} {
+      allow get: if isSignedIn() &&
+                    isValidId(listingId) &&
+                    (existing().userId == request.auth.uid || existing().status == 'active');
+
+      // Rules are not filters: client queries must filter by status == 'active' or userId == uid
+      allow list: if isSignedIn() &&
+                     (resource.data.userId == request.auth.uid || resource.data.status == 'active');
+
+      allow create: if isSignedIn() &&
+                       isValidId(listingId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().status == 'active' &&
+                       incoming().keys().hasAll([
+                         'userId', 'sellerAlias', 'packageTitle', 'mbAmount',
+                         'priceInr', 'networkType', 'status', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'sellerAlias', 'packageTitle', 'mbAmount',
+                         'priceInr', 'networkType', 'status', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidListing(incoming());
+
+      // Terminal State Lock: closed listings cannot be updated
+      allow update: if isSignedIn() &&
+                       isValidId(listingId) &&
+                       isValidListing(incoming()) &&
+                       existing().userId == request.auth.uid &&
+                       existing().status != 'closed' &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'packageTitle', 'mbAmount', 'priceInr', 'networkType', 'status', 'updatedAt'
+                       ]);
+
+      allow delete: if isSignedIn() &&
+                       isValidId(listingId) &&
+                       existing().userId == request.auth.uid;
+    }
+  }
+}

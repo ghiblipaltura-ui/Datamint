@@ -1,0 +1,134 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated seller profile, node preferences, and wallet ledger totals.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the owner." },
+        "displayName": { "type": "string", "description": "Display name shown in seller profile." },
+        "wifiOnly": { "type": "boolean", "description": "Whether bandwidth sharing runs only on Wi-Fi." },
+        "dailyCapMb": { "type": "integer", "description": "Maximum daily MB quota allowed for sharing." },
+        "minBatteryPct": { "type": "integer", "description": "Minimum battery percentage threshold to pause sharing." },
+        "ratePer100MbInr": { "type": "number", "description": "Estimated INR rate per 100 MB shared." },
+        "totalMbSold": { "type": "number", "description": "Cumulative MB shared across sessions." },
+        "availableBalanceInr": { "type": "number", "description": "Available INR balance eligible for payout request." },
+        "pendingPayoutInr": { "type": "number", "description": "Total INR currently pending settlement." },
+        "totalWithdrawnInr": { "type": "number", "description": "Total INR settled/withdrawn." },
+        "defaultUpiId": { "type": "string", "description": "Optional saved UPI ID or payout handle." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp." }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "wifiOnly",
+        "dailyCapMb",
+        "minBatteryPct",
+        "ratePer100MbInr",
+        "totalMbSold",
+        "availableBalanceInr",
+        "pendingPayoutInr",
+        "totalWithdrawnInr",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "BandwidthSession": {
+      "title": "BandwidthSession",
+      "description": "Recorded bandwidth-sharing session with measured MB and estimated INR credit.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the owner." },
+        "networkType": { "type": "string", "description": "Active network transport (Wi-Fi, 5G, 4G LTE, Mobile)." },
+        "mbShared": { "type": "number", "description": "Megabytes shared during the session." },
+        "estimatedEarningsInr": { "type": "number", "description": "Estimated INR earned for the session." },
+        "avgSpeedMbps": { "type": "number", "description": "Measured link downstream bandwidth in Mbps." },
+        "durationSeconds": { "type": "integer", "description": "Active session duration in seconds." },
+        "status": { "type": "string", "enum": ["completed", "capped"], "description": "Completion status." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp." }
+      },
+      "required": [
+        "userId",
+        "networkType",
+        "mbShared",
+        "estimatedEarningsInr",
+        "avgSpeedMbps",
+        "durationSeconds",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PayoutRequest": {
+      "title": "PayoutRequest",
+      "description": "User payout / withdrawal request recorded in the cloud ledger.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the requester." },
+        "amountInr": { "type": "number", "description": "Requested payout amount in INR." },
+        "method": { "type": "string", "enum": ["UPI", "PayPal", "Bank Transfer"], "description": "Payout channel." },
+        "destination": { "type": "string", "description": "UPI handle, PayPal email, or masked bank reference." },
+        "status": { "type": "string", "enum": ["pending_settlement", "cancelled"], "description": "Current settlement status." },
+        "note": { "type": "string", "description": "Optional payout memo." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp." }
+      },
+      "required": [
+        "userId",
+        "amountInr",
+        "method",
+        "destination",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "DataListing": {
+      "title": "DataListing",
+      "description": "Community MB sell listing published by an authenticated seller.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the seller." },
+        "sellerAlias": { "type": "string", "description": "Public seller alias (no PII)." },
+        "packageTitle": { "type": "string", "description": "Title of the MB package offer." },
+        "mbAmount": { "type": "integer", "description": "Offered data pool in MB." },
+        "priceInr": { "type": "number", "description": "Asking price in INR." },
+        "networkType": { "type": "string", "enum": ["Wi-Fi", "5G", "4G LTE", "Any"], "description": "Network type." },
+        "status": { "type": "string", "enum": ["active", "paused", "closed"], "description": "Listing visibility status." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp." }
+      },
+      "required": [
+        "userId",
+        "sellerAlias",
+        "packageTitle",
+        "mbAmount",
+        "priceInr",
+        "networkType",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user profile, node rules, and wallet ledger totals."
+    },
+    "/users/{userId}/sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/BandwidthSession" },
+      "description": "User-scoped bandwidth sharing session history."
+    },
+    "/users/{userId}/payouts/{payoutId}": {
+      "schema": { "$ref": "#/entities/PayoutRequest" },
+      "description": "User-scoped payout / withdrawal request ledger."
+    },
+    "/listings/{listingId}": {
+      "schema": { "$ref": "#/entities/DataListing" },
+      "description": "Community MB sell offers marketplace."
+    }
+  }
+}

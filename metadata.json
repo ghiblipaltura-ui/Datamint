@@ -1,0 +1,6 @@
+{
+  "name": "DataMint",
+  "description": "Bandwidth & MB sharing ledger, live network telemetry monitor, and payout request tracker.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
